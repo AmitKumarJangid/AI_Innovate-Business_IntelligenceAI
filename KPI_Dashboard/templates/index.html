@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise BI Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .chip {
+            display: inline-block;
+            padding: 5px 12px;
+            margin: 3px;
+            border-radius: 15px;
+            background-color: #e9ecef;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .chip:hover { background-color: #0d6efd; color: white; }
+        .hidden { display: none !important; }
+        .kpi-row { border-left: 3px solid #0d6efd; padding-left: 15px; margin-bottom: 15px; }
+        
+        .chat-box {
+            max-height: 450px;
+            overflow-y: auto;
+            background: #fdfdfd;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .chat-message-user {
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 15px 15px 0px 15px;
+            padding: 10px 15px;
+            max-width: 75%;
+            margin-left: auto;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+        .chat-message-bot {
+            background-color: #f1f3f5;
+            color: #212529;
+            border-radius: 15px 15px 15px 0px;
+            padding: 12px 16px;
+            max-width: 85%;
+            margin-right: auto;
+            margin-bottom: 12px;
+            border-left: 4px solid #0d6efd;
+            font-size: 0.95rem;
+        }
+        .telemetry-badge {
+            font-size: 0.75rem;
+            background: #eef2f7;
+            border: 1px solid #ced4da;
+            color: #495057;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark mb-4 shadow-sm">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="#">📊 BI Intelligence Engine</a>
+    </div>
+</nav>
+
+<div class="container pb-5">
+    
+    <!-- STEP 1: Live Cloud Synchronization -->
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-white border-bottom-0 pt-3">
+            <h5 class="fw-bold mb-0 text-primary">Step 1: Live Cloud Synchronization</h5>
+            <span class="badge bg-success mt-2">Connected to Supabase PostgreSQL</span>
+        </div>
+        <div class="card-body">
+            <button id="btnSyncDB" class="btn btn-dark px-4 fw-bold">
+                <i class="fas fa-database me-2"></i> Fetch Latest Production Data
+            </button>
+            <div id="syncSpinner" class="spinner-border text-primary ms-3 mt-3 hidden" role="status"></div>
+            <p id="syncMessage" class="text-success mt-2 fw-bold hidden"></p>
+            <p id="syncError" class="text-danger mt-2 hidden"></p>
+        </div>
+    </div>
+
+    <!-- STEP 2: Semantic Contract Builder -->
+    <div id="step2" class="card shadow-sm mb-4 border-0 hidden">
+        <div class="card-header bg-white border-bottom-0 pt-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-primary">Step 2: Define Semantic Contract</h5>
+            <select id="personaSelect" class="form-select w-auto form-select-sm">
+                <option value="Bakery Owner">Persona: Bakery Owner</option>
+                <option value="Store Manager">Persona: Store Manager</option>
+                <option value="Head Chef">Persona: Head Chef</option>
+            </select>
+        </div>
+        <div class="card-body bg-light">
+            
+            <div class="row mb-4">
+                <div class="col-md-7">
+                    <p class="small text-muted fw-bold mb-2">1. METRICS (Click to add)</p>
+                    <div id="columnChips" class="mb-3"></div>
+                </div>
+                <div class="col-md-5">
+                    <p class="small text-muted fw-bold mb-2">2. MATH OPERATORS</p>
+                    <div id="operatorChips">
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('+')"> ➕ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('-')"> ➖ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('*')"> ✖️ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('/')"> ➗ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('(')"> ❪ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula(')')"> ❫ </span>
+                        <span class="chip bg-danger text-white" onclick="clearActiveFormula()">⌫</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="kpiContainer"></div>
+            
+            <div class="d-flex justify-content-between mb-4">
+                <button id="btnAddKpi" class="btn btn-outline-secondary btn-sm">+ Add Another KPI</button>
+                <button id="btnSaveKpis" class="btn btn-outline-primary btn-sm">💾 Save KPIs Globally</button>
+            </div>
+            <hr>
+            <button id="btnAnalyze" class="btn btn-success w-100 fw-bold py-2">Run Multi-KPI Analysis</button>
+            <p id="analyzeError" class="text-danger mt-2 hidden"></p>
+        </div>
+    </div>
+
+    <!-- STEP 3: Insights Dashboard -->
+    <div id="step3" class="hidden">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0">Analysis Results</h4>
+        </div>
+
+        <div id="kpiTabsContainer" class="mb-4"></div>
+            
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom-0 pt-3">
+                        <h6 class="mb-0 fw-bold">📈 14-Day KPI Trend Leading to Anomaly</h6>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="resultChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div class="card shadow-sm border-danger h-100">
+                    <div class="card-body">
+                        <h6 class="text-danger fw-bold">⚠️ Flagged KPI</h6>
+                        <h3 id="resKpiName" class="mb-1"></h3>
+                        <p class="fw-bold fs-5" id="observedVal"></p>
+                        <hr>
+                        <p class="mb-1 small"><strong>Date:</strong> <span id="anomalyDate"></span></p>
+                        <p class="mb-1 small"><strong>Z-Score:</strong> <span id="resZ" class="badge bg-danger"></span></p>
+                        <p class="mb-0 small"><strong>Formula:</strong> <code id="resFormula"></code></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <div class="card shadow-sm border-warning h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0 fw-bold">📊 Driver Attribution Ranking</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul id="driversListContainer" class="list-group list-group-flush"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-success h-100">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">🤖 Externally Integrated LLM Synthesis</h6>
+                        <span id="analysisTelemetryBadge" class="badge bg-light text-dark font-monospace fw-normal"></span>
+                    </div>
+                    <div class="card-body fs-6" id="aiReportContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 4: Interactive BI Chatbot -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                        <h6 class="mb-0 fw-bold"><i class="fas fa-comments me-2"></i> Interactive BI Assistant</h6>
+                        <span class="badge bg-primary">Statistical Engine Active</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="chatBox" class="chat-box mb-3 border">
+                            <div class="chat-message-bot">
+                                👋 <b>Welcome!</b> I am connected to your statistical engine. Ask quick questions about metrics, request plots (e.g. <i>"plot Revenue vs COGS"</i>), or ask for external news context.
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="chatInput" class="form-control" placeholder="Ask a question or request a graph (e.g., 'What can you do?')...">
+                            <button id="btnSendChat" class="btn btn-primary px-4 fw-bold">
+                                <i class="fas fa-paper-plane me-1"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let currentFilePath = "";
+    let kpiCount = 0;
+    let currentAnomalies = [];
+    let dynamicCharts = {};
+
+    const btnSyncDB = document.getElementById('btnSyncDB');
+    const syncSpinner = document.getElementById('syncSpinner');
+    const syncMessage = document.getElementById('syncMessage');
+    const syncError = document.getElementById('syncError');
+    const step2 = document.getElementById('step2');
+    const columnChips = document.getElementById('columnChips');
+    const kpiContainer = document.getElementById('kpiContainer');
+    const btnAddKpi = document.getElementById('btnAddKpi');
+    const btnAnalyze = document.getElementById('btnAnalyze');
+    const step3 = document.getElementById('step3');
+    const chatBox = document.getElementById('chatBox');
+    const chatInput = document.getElementById('chatInput');
+    const btnSendChat = document.getElementById('btnSendChat');
+
+    btnSyncDB.addEventListener('click', async () => {
+        syncSpinner.classList.remove('hidden');
+        syncMessage.classList.add('hidden');
+        syncError.classList.add('hidden');
+        btnSyncDB.disabled = true;
+        
+        try {
+            const res = await fetch('/api/fetch_live_data');
+            const data = await res.json();
+            
+            if (data.error) throw new Error(data.error);
+            
+            currentFilePath = data.filepath;
+            renderChips(data.columns);
+            
+            syncMessage.innerText = data.message;
+            syncMessage.classList.remove('hidden');
+            step2.classList.remove('hidden');
+            
+            await fetchSavedKpis(); 
+            
+        } catch (err) {
+            syncError.innerText = "Connection Failed: " + err.message;
+            syncError.classList.remove('hidden');
+        } finally {
+            syncSpinner.classList.add('hidden');
+            btnSyncDB.disabled = false;
+        }
+    });
+
+    function renderChips(columns) {
+        columnChips.innerHTML = '';
+        columns.forEach(col => {
+            if(col.toLowerCase() === 'date') return;
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.innerText = col;
+            chip.onclick = () => insertIntoActiveFormula(col);
+            columnChips.appendChild(chip);
+        });
+    }
+
+    function addKpiRow(savedName = "", savedFormula = "") {
+        kpiCount++;
+        const row = document.createElement('div');
+        row.className = 'kpi-row d-flex align-items-end mb-3';
+        row.innerHTML = `
+            <div class="row g-2 align-items-center flex-grow-1">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">KPI Name</label>
+                    <input type="text" class="form-control kpi-name" value="${savedName}" placeholder="e.g. Net Margin">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label small fw-bold">Formula (Use buttons above)</label>
+                    <input type="text" class="form-control kpi-formula formula-input bg-white" value="${savedFormula}" placeholder="Click here, then click chips to build..." readonly style="cursor: pointer;">
+                </div>
+            </div>
+            <button class="btn btn-outline-danger ms-2 mb-1 remove-kpi-btn" title="Delete KPI">🗑️</button>
+        `;
+        
+        row.querySelector('.formula-input').addEventListener('click', function() {
+            document.querySelectorAll('.formula-input').forEach(el => el.classList.remove('border-primary', 'shadow-sm'));
+            this.classList.add('border-primary', 'shadow-sm');
+            window.activeFormulaInput = this;
+        });
+
+        row.querySelector('.remove-kpi-btn').addEventListener('click', function() {
+            row.remove();
+        });
+
+        kpiContainer.appendChild(row);
+    }
+
+    btnAddKpi.addEventListener('click', () => addKpiRow("", ""));
+
+    async function fetchSavedKpis() {
+        try {
+            const res = await fetch('/api/kpis');
+            const data = await res.json();
+            kpiContainer.innerHTML = '';
+
+            if (data.kpis && data.kpis.length > 0) {
+                data.kpis.forEach(kpi => addKpiRow(kpi.name, kpi.formula));
+            } else {
+                addKpiRow();
+            }
+        } catch (err) {
+            addKpiRow();
+        }
+    }
+
+    function insertIntoActiveFormula(colName) {
+        if(window.activeFormulaInput) {
+            window.activeFormulaInput.value += ` ${colName} `;
+        } else {
+            alert("Please click inside a Formula box first.");
+        }
+    }
+
+    function clearActiveFormula() {
+        if(window.activeFormulaInput) {
+            let currentVal = window.activeFormulaInput.value.trim();
+            if (currentVal === "") return; 
+            let parts = currentVal.split(/\s+/); 
+            parts.pop(); 
+            if (parts.length > 0) {
+                window.activeFormulaInput.value = " " + parts.join(" ") + " ";
+            } else {
+                window.activeFormulaInput.value = "";
+            }
+        } else {
+            alert("Please click inside a Formula box first.");
+        }
+    }
+
+    document.getElementById('btnSaveKpis').addEventListener('click', async () => {
+        const btn = document.getElementById('btnSaveKpis');
+        btn.innerText = "Saving...";
+        
+        const kpis = [];
+        document.querySelectorAll('.kpi-row').forEach(row => {
+            const name = row.querySelector('.kpi-name').value;
+            const formula = row.querySelector('.kpi-formula').value;
+            if(name && formula) kpis.push({name, formula});
+        });
+
+        try {
+            await fetch('/api/kpis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kpis: kpis })
+            });
+            btn.innerText = "✅ Saved!";
+            setTimeout(() => btn.innerText = "💾 Save KPIs Globally", 2000);
+        } catch (err) {
+            alert("Error saving KPIs");
+            btn.innerText = "💾 Save KPIs Globally";
+        }
+    });
+
+    btnAnalyze.addEventListener('click', async () => {
+        const btn = btnAnalyze;
+        btn.innerText = "Processing LLM Narrative...";
+        btn.disabled = true;
+
+        const kpis = [];
+        document.querySelectorAll('.kpi-row').forEach(row => {
+            const name = row.querySelector('.kpi-name').value;
+            const formula = row.querySelector('.kpi-formula').value;
+            if(name && formula) kpis.push({name, formula});
+        });
+
+        if(kpis.length === 0) {
+            alert("Define at least one KPI.");
+            btn.innerText = "Run Multi-KPI Analysis";
+            btn.disabled = false;
+            return;
+        }
+
+        const payload = {
+            filepath: currentFilePath,
+            persona: document.getElementById('personaSelect').value,
+            kpis: kpis
+        };
+
+        try {
+            const res = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            step3.classList.remove('hidden');
+            renderAnomalyTabs(data.anomalies);
+
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            btn.innerText = "Run Multi-KPI Analysis";
+            btn.disabled = false;
+        }
+    });
+
+    function renderAnomalyTabs(anomalies) {
+        currentAnomalies = anomalies;
+        const tabsContainer = document.getElementById('kpiTabsContainer');
+        tabsContainer.innerHTML = '';
+
+        if (!anomalies || anomalies.length === 0) {
+            tabsContainer.innerHTML = '<p class="text-muted">No significant anomalies detected.</p>';
+            return;
+        }
+
+        anomalies.forEach((anomaly, index) => {
+            const isDefault = index === 0 ? 'active btn-dark' : 'btn-outline-dark';
+            const isCritical = Math.abs(anomaly.z_score) >= 1.5;
+            const badgeColor = isCritical ? 'bg-danger' : 'bg-success';
+            const icon = isCritical ? 'fa-exclamation-triangle text-danger' : 'fa-check-circle text-success';
+            
+            const tabButton = document.createElement('button');
+            tabButton.className = `btn btn-sm me-2 mb-2 fw-bold ${isDefault}`;
+            tabButton.innerHTML = `
+                <i class="fas ${icon} me-1"></i> ${anomaly.kpi_name} 
+                <span class="badge ${badgeColor} ms-1">Z: ${anomaly.z_score}</span>
+            `;
+            
+            tabButton.addEventListener('click', () => {
+                document.querySelectorAll('#kpiTabsContainer button').forEach(btn => {
+                    btn.classList.remove('active', 'btn-dark');
+                    btn.classList.add('btn-outline-dark');
+                });
+                tabButton.classList.remove('btn-outline-dark');
+                tabButton.classList.add('active', 'btn-dark');
+                displayAnomalyDetails(anomaly);
+            });
+
+            tabsContainer.appendChild(tabButton);
+        });
+
+        displayAnomalyDetails(anomalies[0]);
+    }
+
+    function displayAnomalyDetails(anomaly) {
+        document.getElementById('resKpiName').innerText = anomaly.kpi_name;
+        document.getElementById('observedVal').innerText = "Value: " + anomaly.observed_value;
+        document.getElementById('anomalyDate').innerText = anomaly.anomaly_date;
+        document.getElementById('resZ').innerText = anomaly.z_score;
+        document.getElementById('resFormula').innerText = anomaly.formula_used;
+        document.getElementById('aiReportContainer').innerHTML = anomaly.ai_report;
+
+        if(anomaly.telemetry) {
+            const t = anomaly.telemetry;
+            document.getElementById('analysisTelemetryBadge').innerHTML = 
+                `⏱️ ${t.latency_sec}s | 🔄 ${t.model_calls} Call | 🪙 ${t.total_tokens} Tokens | 💵 ${t.estimated_cost_usd}`;
+        }
+
+        let driversHtml = '';
+        if (anomaly.ranked_drivers) {
+            anomaly.ranked_drivers.forEach(d => {
+                const isNegative = d.raw_value < 0;
+                const colorClass = isNegative ? 'text-danger' : 'text-success';
+                driversHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">${d.driver}</span> 
+                    <span class="${colorClass} fw-bold">${d.formatted}</span>
+                </li>`;
+            });
+        }
+        document.getElementById('driversListContainer').innerHTML = driversHtml;
+
+        if (window.myChart) {
+            window.myChart.destroy();
+        }
+        const ctx = document.getElementById('resultChart').getContext('2d');
+        const pointColors = anomaly.chart_labels.map(label => label === anomaly.anomaly_date ? 'red' : '#0d6efd');
+        const pointRadiuses = anomaly.chart_labels.map(label => label === anomaly.anomaly_date ? 8 : 4);
+
+        window.myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: anomaly.chart_labels,
+                datasets: [{
+                    label: anomaly.kpi_name,
+                    data: anomaly.chart_data,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: pointColors,
+                    pointRadius: pointRadiuses,
+                    fill: true,
+                    tension: 0.2
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: false } }
+            }
+        });
+    }
+
+    // --- CHATBOT ENGINE ---
+    btnSendChat.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendChatMessage();
+    });
+
+    async function sendChatMessage() {
+        const query = chatInput.value.trim();
+        if (!query) return;
+
+        appendUserMessage(query);
+        chatInput.value = '';
+
+        const typingId = appendTypingIndicator();
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: query,
+                    filepath: currentFilePath,
+                    persona: document.getElementById('personaSelect').value
+                })
+            });
+
+            const data = await res.json();
+            removeMessage(typingId);
+
+            if (data.status === 'success') {
+                appendBotMessage(data.reply, data.chart, data.telemetry);
+            } else {
+                appendBotMessage("⚠️ " + data.reply);
+            }
+
+        } catch (err) {
+            removeMessage(typingId);
+            appendBotMessage("⚠️ Communication error: " + err.message);
+        }
+    }
+
+    function appendUserMessage(text) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'chat-message-user';
+        msgDiv.innerText = text;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function appendBotMessage(htmlContent, chartPayload = null, telemetry = null) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'chat-message-bot';
+        msgDiv.innerHTML = htmlContent;
+
+        if (chartPayload) {
+            const chartCanvasId = chartPayload.chart_id;
+            const chartWrapper = document.createElement('div');
+            chartWrapper.className = 'mt-3 p-2 bg-white rounded border';
+            chartWrapper.innerHTML = `<canvas id="${chartCanvasId}" height="120"></canvas>`;
+            msgDiv.appendChild(chartWrapper);
+
+            setTimeout(() => {
+                const ctx = document.getElementById(chartCanvasId).getContext('2d');
+                dynamicCharts[chartCanvasId] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartPayload.labels,
+                        datasets: [{
+                            label: `${chartPayload.y_col} vs ${chartPayload.x_col}`,
+                            data: chartPayload.values,
+                            borderColor: '#198754',
+                            backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2
+                        }]
+                    },
+                    options: { responsive: true }
+                });
+            }, 100);
+        }
+
+        if (telemetry) {
+            const telemDiv = document.createElement('div');
+            telemDiv.className = 'mt-2 pt-2 border-top d-flex gap-2 flex-wrap';
+            telemDiv.innerHTML = `
+                <span class="telemetry-badge">⏱️ Latency: <b>${telemetry.latency_sec}s</b></span>
+                <span class="telemetry-badge">🔄 Model Calls: <b>${telemetry.model_calls}</b></span>
+                <span class="telemetry-badge">🪙 Input Tokens: <b>${telemetry.input_tokens}</b></span>
+                <span class="telemetry-badge">🪙 Output Tokens: <b>${telemetry.output_tokens}</b></span>
+                <span class="telemetry-badge">💵 Cost: <b>${telemetry.estimated_cost_usd}</b></span>
+            `;
+            msgDiv.appendChild(telemDiv);
+        }
+
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function appendTypingIndicator() {
+        const id = 'typing_' + Date.now();
+        const msgDiv = document.createElement('div');
+        msgDiv.id = id;
+        msgDiv.className = 'chat-message-bot text-muted';
+        msgDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processing statistical context...';
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return id;
+    }
+
+    function removeMessage(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    }
+</script>
+</body>
+</html>
