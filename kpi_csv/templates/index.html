@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise BI Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <style>
+        body { background-color: #f8f9fa; }
+        .chip {
+            display: inline-block;
+            padding: 5px 12px;
+            margin: 3px;
+            border-radius: 15px;
+            background-color: #e9ecef;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .chip:hover { background-color: #0d6efd; color: white; }
+        .hidden { display: none !important; }
+        .kpi-row { border-left: 3px solid #0d6efd; padding-left: 15px; margin-bottom: 15px; }
+        .nav-pills .nav-link { cursor: pointer; transition: all 0.2s ease-in-out; }
+        .segment-badge { cursor: pointer; transition: transform 0.15s ease-in-out; }
+        .segment-badge:hover { transform: scale(1.03); }
+        
+        /* Chatbot Custom Styling */
+        .chat-box {
+            height: 380px;
+            overflow-y: auto;
+            background-color: #f1f3f5;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .chat-msg-user {
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 15px 15px 2px 15px;
+            padding: 10px 14px;
+            max-width: 75%;
+            margin-left: auto;
+            margin-bottom: 12px;
+            font-size: 0.92rem;
+        }
+        .chat-msg-assistant {
+            background-color: #ffffff;
+            color: #212529;
+            border: 1px solid #dee2e6;
+            border-radius: 15px 15px 15px 2px;
+            padding: 12px 16px;
+            max-width: 85%;
+            margin-right: auto;
+            margin-bottom: 12px;
+            font-size: 0.92rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark bg-dark mb-4 shadow-sm">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="#">📊 BI Intelligence Engine</a>
+    </div>
+</nav>
+
+<div class="container pb-5">
+    
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-white border-bottom-0 pt-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-primary">Step 1: Data Ingestion & Daily Aggregation</h5>
+            <div>
+                <span class="badge bg-secondary">Deterministic Python Engine</span>
+                <span class="badge bg-info text-dark">Native Pandas Aggregation</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 border-end">
+                    <label class="form-label small fw-bold">System A: Primary Source (e.g., Daily DB Export)</label>
+                    <input type="file" id="fileInput1" class="form-control mb-2" accept=".csv, .xlsx">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold">System B: Secondary Source (Optional)</label>
+                    <input type="file" id="fileInput2" class="form-control mb-2" accept=".csv, .xlsx">
+                </div>
+            </div>
+            
+            <button id="btnUpload" class="btn btn-primary px-4 fw-bold mt-3">Reconcile & Align Datasets</button>
+            <div id="uploadSpinner" class="spinner-border text-primary ms-3 mt-3 hidden" role="status"></div>
+            <p id="uploadError" class="text-danger mt-2 hidden"></p>
+        </div>
+    </div>
+
+    <div id="step2" class="card shadow-sm mb-4 border-0 hidden">
+        <div class="card-header bg-white border-bottom-0 pt-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-primary">Step 2: Define Semantic Contract</h5>
+            <div class="d-flex gap-3 align-items-center">
+                
+                <div>
+                    <label class="form-label mb-1 small text-muted fw-bold">Group By Dimension(s):</label>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle text-truncate" type="button" id="groupByDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 180px; max-width: 240px;">
+                            Select Dimension(s)
+                        </button>
+                        <ul class="dropdown-menu p-2 shadow" id="groupByDropdownMenu" aria-labelledby="groupByDropdownBtn" style="max-height: 200px; overflow-y: auto;">
+                            </ul>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label mb-1 small text-muted fw-bold">Persona:</label>
+                    <select id="personaSelect" class="form-select form-select-sm">
+                        <option value="Financial Analyst">Financial Analyst</option>
+                        <option value="CEO">CEO</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+        <div class="card-body bg-light">
+            <div class="row mb-4">
+                <div class="col-md-7">
+                    <p class="small text-muted fw-bold mb-2">1. METRICS (Click to add)</p>
+                    <div id="columnChips" class="mb-3"></div>
+                </div>
+                <div class="col-md-5">
+                    <p class="small text-muted fw-bold mb-2">2. MATH OPERATORS</p>
+                    <div id="operatorChips">
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('+')"> ➕ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('-')"> ➖ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('*')"> ✖️ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('/')"> ➗ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula('(')"> ❪ </span>
+                        <span class="chip bg-dark text-white" onclick="insertIntoActiveFormula(')')"> ❫ </span>
+                        <span class="chip bg-danger text-white" onclick="clearActiveFormula()">⌫</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="kpiContainer"></div>
+            
+            <button id="btnAddKpi" class="btn btn-outline-secondary btn-sm mb-4">+ Add Another KPI</button>
+            <hr>
+            <button id="btnAnalyze" class="btn btn-success w-100 fw-bold py-2">Run Multi-KPI Analysis</button>
+            <p id="analyzeError" class="text-danger mt-2 hidden"></p>
+        </div>
+    </div>
+
+    <div id="step3" class="hidden">
+        <h4 class="fw-bold mb-3">Analysis Results</h4>
+        
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-bottom-0 pt-3">
+                <h6 class="fw-bold text-secondary mb-2">Select Active KPI (Ranked by Anomaly Severity):</h6>
+                <ul class="nav nav-pills card-header-pills mb-3" id="kpiTabsNav"></ul>
+
+                <div id="segmentAnomaliesContainer" class="border-top pt-3 hidden">
+                    <h6 class="fw-bold text-dark mb-2">📍 Flagged Segment Anomalies (Click to Analyze Slices):</h6>
+                    <div id="segmentBadgesWrapper"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom-0 pt-3 d-flex justify-content-between">
+                        <h6 id="chartHeaderTitle" class="mb-0 fw-bold">📈 14-Day KPI Trend Leading to Anomaly</h6>
+                        <span id="activeContextBadge" class="badge bg-primary fs-6">Scope: Overall Dataset</span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="resultChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div id="kpiDetailsCard" class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 id="kpiDetailsTitle" class="fw-bold"></h6>
+                        <h3 id="resKpiName" class="mb-1"></h3>
+                        <p class="fw-bold fs-5" id="resValue"></p>
+                        <hr>
+                        <p class="mb-1 small"><strong>Date:</strong> <span id="resDate"></span></p>
+                        <p class="mb-1 small"><strong>Z-Score:</strong> <span id="resZ" class="badge"></span></p>
+                        <p class="mb-0 small"><strong>Formula:</strong> <code id="resFormula"></code></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <div class="card shadow-sm border-warning h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0 fw-bold">📊 Driver Attribution Ranking</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm table-striped mb-0 text-center">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Metric (Driver)</th>
+                                    <th>Impact vs Baseline</th>
+                                </tr>
+                            </thead>
+                            <tbody id="driverTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12 mb-3">
+                <div class="card shadow-sm border-success h-100">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">🤖 Comprehensive LLM Synthesis Narrative</h6>
+                    </div>
+                    <div class="card-body fs-6" id="resAiReport"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow border-0">
+                    <div class="card-header bg-primary text-white pt-3">
+                        <h6 class="fw-bold mb-0">💬 Interactive BI Assistant & Custom Visualizer</h6>
+                    </div>
+                    <div class="card-body bg-white">
+                        <div class="mb-3">
+                            <span class="chip bg-light border text-dark" onclick="sendQuickChat('Show a bar chart of the metric distributions across dates')">📊 Plot Metric Trend</span>
+                            <span class="chip bg-light border text-dark" onclick="sendQuickChat('What are the main insights from customer reviews dataset?')">💬 Review Insights</span>
+                            <span class="chip bg-light border text-dark" onclick="sendQuickChat('Generate a pie chart breakdown of ratings or categories')">🥧 Pie Chart Breakdown</span>
+                        </div>
+
+                        <div id="chatMessagesBox" class="chat-box mb-3">
+                            <div class="chat-msg-assistant">
+                                🤖 <b>Hello!</b> I have full context of your primary and secondary datasets. What would you like to explore or visualize?
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="chatInput" class="form-control" placeholder="Ask a question or request a plot/chart..." onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                            <button id="btnSendChat" class="btn btn-primary fw-bold" onclick="sendChatMessage()">Send Query</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+    let currentFilePath = "";
+    let currentReviewsFilePath = "";
+    let kpiCount = 0;
+    let overallKpisData = [];
+    let segmentAnomaliesData = {};
+    let activeKpiList = [];
+
+    const colorPalette = [
+        '#0d6efd', '#198754', '#ffc107', '#dc3545', 
+        '#6f42c1', '#0dcaf0', '#fd7e14', '#20c997', 
+        '#d63384', '#6c757d'
+    ];
+
+    const btnUpload = document.getElementById('btnUpload');
+    const fileInput1 = document.getElementById('fileInput1');
+    const fileInput2 = document.getElementById('fileInput2');
+    const step2 = document.getElementById('step2');
+    const columnChips = document.getElementById('columnChips');
+    const groupByDropdownMenu = document.getElementById('groupByDropdownMenu');
+    const groupByDropdownBtn = document.getElementById('groupByDropdownBtn');
+    const kpiContainer = document.getElementById('kpiContainer');
+    const btnAddKpi = document.getElementById('btnAddKpi');
+    const btnAnalyze = document.getElementById('btnAnalyze');
+    const step3 = document.getElementById('step3');
+    const kpiTabsNav = document.getElementById('kpiTabsNav');
+
+    btnUpload.addEventListener('click', async () => {
+        if(!fileInput1.files[0]) return alert("Please select a Primary Source file.");
+        
+        document.getElementById('uploadSpinner').classList.remove('hidden');
+        document.getElementById('uploadError').classList.add('hidden');
+
+        const formData = new FormData();
+        formData.append("file1", fileInput1.files[0]);
+        if(fileInput2.files[0]) {
+            formData.append("file2", fileInput2.files[0]);
+        }
+
+        try {
+            const res = await fetch('/api/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            if(data.error) throw new Error(data.error);
+            
+            currentFilePath = data.filepath;
+            currentReviewsFilePath = data.reviews_filepath || "";
+            renderChips(data.numeric_columns);
+            renderGroupByOptions(data.categorical_columns);
+            
+            step2.classList.remove('hidden');
+            kpiContainer.innerHTML = ''; 
+            addKpiRow();
+            
+        } catch (err) {
+            document.getElementById('uploadError').innerText = err.message;
+            document.getElementById('uploadError').classList.remove('hidden');
+        } finally {
+            document.getElementById('uploadSpinner').classList.add('hidden');
+        }
+    });
+
+    function renderChips(columns) {
+        columnChips.innerHTML = '';
+        columns.forEach(col => {
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.innerText = col;
+            chip.onclick = () => insertIntoActiveFormula(col);
+            columnChips.appendChild(chip);
+        });
+    }
+
+    function renderGroupByOptions(catCols) {
+        groupByDropdownMenu.innerHTML = '';
+        if(!catCols || catCols.length === 0) {
+            groupByDropdownMenu.innerHTML = '<li class="dropdown-item text-muted small">No categorical dimensions found</li>';
+            groupByDropdownBtn.innerText = "No Dimensions";
+            return;
+        }
+
+        catCols.forEach((col, idx) => {
+            const li = document.createElement('li');
+            li.className = 'px-2 py-1';
+            li.innerHTML = `
+                <div class="form-check">
+                    <input class="form-check-input group-by-cb" type="checkbox" value="${col}" id="chk_dim_${idx}" onchange="updateGroupByButtonText()">
+                    <label class="form-check-label small" for="chk_dim_${idx}">${col}</label>
+                </div>
+            `;
+            groupByDropdownMenu.appendChild(li);
+        });
+        updateGroupByButtonText();
+    }
+
+    function updateGroupByButtonText() {
+        const selected = Array.from(document.querySelectorAll('.group-by-cb:checked')).map(cb => cb.value);
+        if(selected.length === 0) {
+            groupByDropdownBtn.innerText = "Select Dimension(s)";
+        } else {
+            groupByDropdownBtn.innerText = selected.join(', ');
+        }
+    }
+
+    function getSelectedGroupByCols() {
+        return Array.from(document.querySelectorAll('.group-by-cb:checked')).map(cb => cb.value);
+    }
+
+    function addKpiRow() {
+        kpiCount++;
+        const row = document.createElement('div');
+        row.className = 'kpi-row';
+        row.innerHTML = `
+            <div class="row g-2 align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">KPI Name</label>
+                    <input type="text" class="form-control kpi-name" placeholder="e.g. Net Margin">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label small fw-bold">Formula (Use buttons above)</label>
+                    <input type="text" class="form-control kpi-formula formula-input bg-white" placeholder="Click here, then click chips to build..." readonly style="cursor: pointer;">
+                </div>
+            </div>
+        `;
+        
+        row.querySelector('.formula-input').addEventListener('click', function() {
+            document.querySelectorAll('.formula-input').forEach(el => el.classList.remove('border-primary', 'shadow-sm'));
+            this.classList.add('border-primary', 'shadow-sm');
+            window.activeFormulaInput = this;
+        });
+        kpiContainer.appendChild(row);
+    }
+
+    btnAddKpi.addEventListener('click', addKpiRow);
+
+    function insertIntoActiveFormula(colName) {
+        if(window.activeFormulaInput) {
+            window.activeFormulaInput.value += ` ${colName} `;
+        } else {
+            alert("Please click inside a Formula box first.");
+        }
+    }
+
+    function clearActiveFormula() {
+        if(window.activeFormulaInput) {
+            let currentVal = window.activeFormulaInput.value.trim();
+            if (currentVal === "") return; 
+            let parts = currentVal.split(/\s+/); 
+            parts.pop(); 
+            if (parts.length > 0) {
+                window.activeFormulaInput.value = " " + parts.join(" ") + " ";
+            } else {
+                window.activeFormulaInput.value = "";
+            }
+        } else {
+            alert("Please click inside a Formula box first.");
+        }
+    }
+
+    btnAnalyze.addEventListener('click', async () => {
+        const btn = btnAnalyze;
+        btn.innerText = "Processing LLM Narrative...";
+        btn.disabled = true;
+
+        const kpis = [];
+        document.querySelectorAll('.kpi-row').forEach(row => {
+            const name = row.querySelector('.kpi-name').value;
+            const formula = row.querySelector('.kpi-formula').value;
+            if(name && formula) kpis.push({name, formula});
+        });
+
+        if(kpis.length === 0) {
+            alert("Define at least one KPI.");
+            btn.innerText = "Run Multi-KPI Analysis";
+            btn.disabled = false;
+            return;
+        }
+
+        const payload = {
+            filepath: currentFilePath,
+            reviews_filepath: currentReviewsFilePath,
+            persona: document.getElementById('personaSelect').value,
+            kpis: kpis,
+            group_by_cols: getSelectedGroupByCols()
+        };
+
+        try {
+            const res = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error);
+
+            overallKpisData = data.overall_kpis || [];
+            segmentAnomaliesData = data.segment_anomalies || {};
+
+            document.getElementById('resAiReport').innerHTML = data.ai_report;
+
+            renderOverallKpiTabs(overallKpisData);
+            renderSegmentAnomalies(segmentAnomaliesData);
+
+            if(overallKpisData.length > 0) {
+                switchToOverallContext();
+            }
+
+            step3.classList.remove('hidden');
+
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            btn.innerText = "Run Multi-KPI Analysis";
+            btn.disabled = false;
+        }
+    });
+
+    function renderOverallKpiTabs(kpiList) {
+        kpiTabsNav.innerHTML = '';
+        kpiList.forEach((kpi, idx) => {
+            const li = document.createElement('li');
+            li.className = 'nav-item me-2 mb-2';
+            
+            const badgeColor = kpi.anomaly_type === 'drop' ? 'bg-danger' : 'bg-success';
+            
+            li.innerHTML = `
+                <a class="nav-link ${idx === 0 ? 'active' : 'bg-light text-dark'}" id="tab-kpi-${idx}" onclick="selectKpiTab(${idx})" onmouseenter="selectKpiTab(${idx})">
+                    ${kpi.kpi_name} <span class="badge ${badgeColor} ms-1">Z: ${kpi.z_score > 0 ? '+' + kpi.z_score : kpi.z_score}</span>
+                </a>
+            `;
+            kpiTabsNav.appendChild(li);
+        });
+    }
+
+    function renderSegmentAnomalies(segmentData) {
+        const container = document.getElementById('segmentAnomaliesContainer');
+        const wrapper = document.getElementById('segmentBadgesWrapper');
+        wrapper.innerHTML = '';
+
+        const dimensions = Object.keys(segmentData);
+        if(dimensions.length === 0) {
+            container.classList.add('hidden');
+            return;
+        }
+
+        container.classList.remove('hidden');
+
+        // Default View Reset Button
+        const defaultDiv = document.createElement('div');
+        defaultDiv.className = 'mb-2 pb-2 border-bottom d-flex align-items-center gap-2';
+        defaultDiv.innerHTML = `
+            <button class="btn btn-sm btn-primary segment-badge fw-bold" id="btnOverallScope" onclick="switchToOverallContext()">
+                🌐 Overall Dataset (Default View)
+            </button>
+            <span class="text-muted small">Click anytime to return to default date-level aggregation.</span>
+        `;
+        wrapper.appendChild(defaultDiv);
+
+        dimensions.forEach(dim => {
+            const dimDiv = document.createElement('div');
+            dimDiv.className = 'mb-2';
+            
+            let html = `<span class="fw-bold small me-2 text-secondary">${dim}:</span>`;
+            
+            segmentData[dim].forEach(seg => {
+                const badgeColor = seg.anomaly_type === 'drop' ? 'bg-danger' : 'bg-success';
+                const zFormatted = seg.max_z_score > 0 ? '+' + seg.max_z_score : seg.max_z_score;
+                
+                html += `
+                    <button class="btn btn-sm btn-outline-dark me-2 mb-1 segment-badge seg-btn" data-dim="${dim}" data-seg="${seg.segment_name}" onclick="selectSegment('${dim}', '${seg.segment_name}')">
+                        📍 ${seg.segment_name} <span class="badge ${badgeColor}">${zFormatted}</span>
+                    </button>
+                `;
+            });
+            
+            dimDiv.innerHTML = html;
+            wrapper.appendChild(dimDiv);
+        });
+    }
+
+    function switchToOverallContext() {
+        const overallBtn = document.getElementById('btnOverallScope');
+        if(overallBtn) {
+            overallBtn.classList.remove('btn-outline-primary');
+            overallBtn.classList.add('btn-primary');
+        }
+        document.querySelectorAll('.seg-btn').forEach(btn => {
+            btn.classList.remove('btn-dark', 'text-white');
+            btn.classList.add('btn-outline-dark');
+        });
+
+        switchContext('Overall Dataset', overallKpisData);
+    }
+
+    function switchContext(scopeTitle, kpisList) {
+        activeKpiList = kpisList;
+        document.getElementById('activeContextBadge').innerText = "Scope: " + scopeTitle;
+        renderOverallKpiTabs(activeKpiList);
+        if(activeKpiList.length > 0) {
+            selectKpiTab(0);
+        }
+    }
+
+    function selectSegment(dimension, segmentName) {
+        if(segmentAnomaliesData[dimension]) {
+            const seg = segmentAnomaliesData[dimension].find(s => s.segment_name === segmentName);
+            if(seg && seg.kpis) {
+                const overallBtn = document.getElementById('btnOverallScope');
+                if(overallBtn) {
+                    overallBtn.classList.remove('btn-primary');
+                    overallBtn.classList.add('btn-outline-primary');
+                }
+                
+                document.querySelectorAll('.seg-btn').forEach(btn => {
+                    if(btn.dataset.dim === dimension && btn.dataset.seg === segmentName) {
+                        btn.classList.remove('btn-outline-dark');
+                        btn.classList.add('btn-dark', 'text-white');
+                    } else {
+                        btn.classList.remove('btn-dark', 'text-white');
+                        btn.classList.add('btn-outline-dark');
+                    }
+                });
+
+                switchContext(`${dimension} = ${segmentName}`, seg.kpis);
+            }
+        }
+    }
+
+    function selectKpiTab(index) {
+        document.querySelectorAll('#kpiTabsNav .nav-link').forEach((tab, i) => {
+            if(i === index) {
+                tab.classList.add('active');
+                tab.classList.remove('bg-light', 'text-dark');
+            } else {
+                tab.classList.remove('active');
+                tab.classList.add('bg-light', 'text-dark');
+            }
+        });
+
+        displayKpiDetails(index);
+    }
+
+    function displayKpiDetails(index) {
+        const kpi = activeKpiList[index];
+        if(!kpi) return;
+
+        const isDrop = kpi.anomaly_type === 'drop';
+        const kpiCard = document.getElementById('kpiDetailsCard');
+        const cardTitle = document.getElementById('kpiDetailsTitle');
+        const resZBadge = document.getElementById('resZ');
+
+        if(isDrop) {
+            kpiCard.className = 'card shadow-sm border-danger h-100';
+            cardTitle.className = 'fw-bold text-danger';
+            cardTitle.innerText = '⚠️ Flagged KPI Details (Drop)';
+            resZBadge.className = 'badge bg-danger';
+        } else {
+            kpiCard.className = 'card shadow-sm border-success h-100';
+            cardTitle.className = 'fw-bold text-success';
+            cardTitle.innerText = '📈 Flagged KPI Details (Rise / Spike)';
+            resZBadge.className = 'badge bg-success';
+        }
+
+        document.getElementById('resKpiName').innerText = kpi.kpi_name;
+        document.getElementById('resValue').innerText = "Value: " + kpi.observed_value;
+        document.getElementById('resDate').innerText = kpi.anomaly_date;
+        document.getElementById('resZ').innerText = kpi.z_score > 0 ? '+' + kpi.z_score : kpi.z_score;
+        document.getElementById('resFormula').innerText = kpi.formula_used;
+
+        const tbody = document.getElementById('driverTableBody');
+        tbody.innerHTML = '';
+        if (kpi.ranked_drivers) {
+            kpi.ranked_drivers.forEach(driver => {
+                const isNegative = driver.raw_value < 0;
+                const colorClass = isNegative ? 'text-danger' : 'text-success';
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fw-bold align-middle">${driver.driver}</td>
+                    <td class="${colorClass} fw-bold align-middle">${driver.formatted}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        if (window.myChart) {
+            window.myChart.destroy();
+        }
+        const ctx = document.getElementById('resultChart').getContext('2d');
+        const anomalyPointColor = isDrop ? '#dc3545' : '#198754';
+        
+        const pointColors = kpi.chart_labels.map(label => 
+            label === kpi.anomaly_date ? anomalyPointColor : '#0d6efd'
+        );
+        const pointRadiuses = kpi.chart_labels.map(label => 
+            label === kpi.anomaly_date ? 8 : 4
+        );
+
+        window.myChart = new window.Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: kpi.chart_labels,
+                datasets: [{
+                    label: kpi.kpi_name,
+                    data: kpi.chart_data,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: pointColors,
+                    pointRadius: pointRadiuses,
+                    fill: true,
+                    tension: 0.2
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: false } }
+            }
+        });
+    }
+
+    /* ---------------- Chatbot Implementation ---------------- */
+    function sendQuickChat(promptText) {
+        document.getElementById('chatInput').value = promptText;
+        sendChatMessage();
+    }
+
+    async function sendChatMessage() {
+        const inputEl = document.getElementById('chatInput');
+        const userMsg = inputEl.value.trim();
+        if(!userMsg) return;
+
+        const chatBox = document.getElementById('chatMessagesBox');
+        
+        // Append User Message
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-msg-user';
+        userDiv.innerText = userMsg;
+        chatBox.appendChild(userDiv);
+        inputEl.value = '';
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Append Loading Spinner Message
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'chat-msg-assistant text-muted';
+        loadingDiv.innerHTML = '🤖 <i>Analyzing dataset & generating insights...</i>';
+        chatBox.appendChild(loadingDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filepath: currentFilePath,
+                    reviews_filepath: currentReviewsFilePath,
+                    message: userMsg
+                })
+            });
+            const data = await res.json();
+            
+            loadingDiv.remove();
+            
+            const botDiv = document.createElement('div');
+            botDiv.className = 'chat-msg-assistant';
+            botDiv.innerHTML = data.reply || data.error || "No response received.";
+
+            // If a custom chart/graph is returned in response
+            if(data.chart) {
+                const canvasId = 'chat_chart_' + Date.now();
+                const chartWrapper = document.createElement('div');
+                chartWrapper.className = 'mt-3 p-2 bg-light rounded border';
+                chartWrapper.innerHTML = `
+                    <h6 class="fw-bold text-center text-secondary mb-2">${data.chart.title || 'Data Graph'}</h6>
+                    <canvas id="${canvasId}" height="140"></canvas>
+                `;
+                botDiv.appendChild(chartWrapper);
+
+                setTimeout(() => {
+                    const ctx = document.getElementById(canvasId).getContext('2d');
+                    const datasets = data.chart.datasets || [];
+                    const isMultiDataset = datasets.length > 1;
+
+                    new Chart(ctx, {
+                        type: data.chart.type || 'bar',
+                        data: {
+                            labels: data.chart.labels,
+                            datasets: datasets.map((ds, idx) => {
+                                let bgColor;
+                                let borderColor;
+
+                                if (isMultiDataset) {
+                                    bgColor = colorPalette[idx % colorPalette.length];
+                                    borderColor = colorPalette[idx % colorPalette.length];
+                                } else if (['pie', 'doughnut', 'bar'].includes(data.chart.type)) {
+                                    bgColor = colorPalette;
+                                    borderColor = '#ffffff';
+                                } else {
+                                    bgColor = colorPalette[0];
+                                    borderColor = colorPalette[0];
+                                }
+
+                                return {
+                                    label: ds.label,
+                                    data: ds.data,
+                                    backgroundColor: bgColor,
+                                    borderColor: borderColor,
+                                    borderWidth: 1
+                                };
+                            })
+                        },
+                        options: { 
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                }
+                            }
+                        }
+                    });
+                }, 100);
+            }
+
+            chatBox.appendChild(botDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+        } catch (err) {
+            loadingDiv.className = 'chat-msg-assistant text-danger';
+            loadingDiv.innerText = '⚠️ Error: ' + err.message;
+        }
+    }
+</script>
+</body>
+</html>
